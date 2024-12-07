@@ -7,18 +7,13 @@ import com.example.bureaucratic_system_backend.service.BookLoaningService;
 import com.example.bureaucratic_system_backend.service.CitizenService;
 import com.example.bureaucratic_system_backend.service.EnrollmentDepartmentService;
 import com.example.bureaucratic_system_backend.service.FeeService;
-import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.auth.FirebaseToken;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -29,6 +24,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/citizens")
+@Tag(name = "Citizen Controller", description = "Endpoints for managing citizens, loans, and fees")
 public class ApiController {
 
     private static final Logger logger = LoggerFactory.getLogger(ApiController.class);
@@ -45,26 +41,8 @@ public class ApiController {
     @Autowired
     private EnrollmentDepartmentService enrollmentDepartmentService;
 
-    /**
-     * Extracts the role from the provided JWT token.
-     *
-     * @param token the JWT token from the Authorization header
-     * @return the role of the user
-     * @throws Exception if token verification fails or role is not present
-     */
-    private String extractRoleFromToken(String token) throws Exception {
-        FirebaseToken decodedToken = FirebaseAuth.getInstance().verifyIdToken(token.replace("Bearer ", ""));
-        return (String) decodedToken.getClaims().get("role");
-    }
-
-    /**
-     * Creates a new citizen in the system.
-     *
-     * @param citizen the Citizen object to be created
-     * @return ResponseEntity with success or error message
-     */
     @Operation(
-            summary = "Create a New Citizen",
+            summary = "Create a new citizen",
             description = "Adds a new citizen to the system.",
             responses = {
                     @ApiResponse(responseCode = "200", description = "Citizen created successfully."),
@@ -84,37 +62,20 @@ public class ApiController {
         }
     }
 
-    /**
-     * Enrolls a citizen into the enrollment department.
-     *
-     * @param token   the JWT token from the Authorization header
-     * @param citizen the Citizen object to enroll
-     * @return ResponseEntity with success or error message
-     */
     @Operation(
-            summary = "Enroll a Citizen",
+            summary = "Enroll a citizen",
             description = "Enrolls a citizen into the enrollment department.",
-            security = @SecurityRequirement(name = "bearerAuth"),
             responses = {
                     @ApiResponse(responseCode = "200", description = "Citizen enrolled successfully."),
                     @ApiResponse(responseCode = "400", description = "Enrollment failed."),
-                    @ApiResponse(responseCode = "401", description = "Unauthorized."),
-                    @ApiResponse(responseCode = "403", description = "Access denied: citizen only.")
+                    @ApiResponse(responseCode = "500", description = "Internal server error.")
             }
     )
     @PostMapping(value = "/enroll", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> enrollCitizen(
-            @Parameter(description = "Bearer JWT token", required = true, in = ParameterIn.HEADER)
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String token,
             @Parameter(description = "Citizen object to enroll", required = true)
             @RequestBody Citizen citizen) {
         try {
-            String role = extractRoleFromToken(token);
-            if (!"citizen".equals(role)) {
-                logger.warn("Access denied: role {} is not authorized to enroll citizens.", role);
-                return ResponseEntity.status(403).body("Access denied: citizen only.");
-            }
-
             boolean success = enrollmentDepartmentService.enrollCitizen(citizen);
             if (success) {
                 return ResponseEntity.ok("Citizen enrolled successfully.");
@@ -123,75 +84,46 @@ public class ApiController {
                 return ResponseEntity.badRequest().body("Enrollment failed.");
             }
         } catch (Exception e) {
-            logger.error("Unauthorized access attempt: {}", e.getMessage());
-            return ResponseEntity.status(401).body("Unauthorized");
+            logger.error("Error enrolling citizen: {}", e.getMessage());
+            return ResponseEntity.status(500).body("Internal server error.");
         }
     }
 
-    /**
-     * Processes a loan request from a citizen.
-     *
-     * @param token       the JWT token from the Authorization header
-     * @param loanRequest the LoanRequest object containing loan details
-     * @return ResponseEntity with success or error message
-     */
     @Operation(
-            summary = "Process a Loan Request",
+            summary = "Process a loan request",
             description = "Processes a loan request from a citizen.",
-            security = @SecurityRequirement(name = "bearerAuth"),
             responses = {
                     @ApiResponse(responseCode = "200", description = "Loan request processed successfully."),
-                    @ApiResponse(responseCode = "401", description = "Unauthorized."),
-                    @ApiResponse(responseCode = "403", description = "Access denied: citizen only.")
+                    @ApiResponse(responseCode = "500", description = "Internal server error.")
             }
     )
     @PostMapping(value = "/loan-request", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> processLoanRequest(
-            @Parameter(description = "Bearer JWT token", required = true, in = ParameterIn.HEADER)
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String token,
             @Parameter(description = "LoanRequest object containing loan details", required = true)
             @RequestBody LoanRequest loanRequest) {
         try {
-            String role = extractRoleFromToken(token);
-            if (!"citizen".equals(role)) {
-                logger.warn("Access denied: role {} is not authorized to process loan requests.", role);
-                return ResponseEntity.status(403).body("Access denied: citizen only.");
-            }
-
             Citizen citizen = new Citizen();
             citizen.setId(loanRequest.getCitizenId());
             bookLoaningService.addCitizenToQueue(citizen, loanRequest.getBookTitle(), loanRequest.getBookAuthor());
             return ResponseEntity.ok("Loan request processed successfully.");
         } catch (Exception e) {
-            logger.error("Unauthorized access attempt: {}", e.getMessage());
-            return ResponseEntity.status(401).body("Unauthorized");
+            logger.error("Error processing loan request: {}", e.getMessage());
+            return ResponseEntity.status(500).body("Internal server error.");
         }
     }
 
-    /**
-     * Retrieves the fee associated with a specific borrow ID.
-     *
-     * @param token    the JWT token from the Authorization header
-     * @param borrowId the borrow ID to retrieve the fee for
-     * @return ResponseEntity containing the Fees object or an error message
-     */
     @Operation(
-            summary = "Get Fee by Borrow ID",
+            summary = "Get fee by borrow ID",
             description = "Retrieves the fee associated with a specific borrow ID.",
-            security = @SecurityRequirement(name = "bearerAuth"),
             responses = {
-                    @ApiResponse(responseCode = "200", description = "Fee retrieved successfully.",
-                            content = @io.swagger.v3.oas.annotations.media.Content(mediaType = "application/json",
-                                    schema = @io.swagger.v3.oas.annotations.media.Schema(implementation = Fees.class))),
-                    @ApiResponse(responseCode = "404", description = "Fee not found for the provided borrow ID."),
+                    @ApiResponse(responseCode = "200", description = "Fee retrieved successfully."),
+                    @ApiResponse(responseCode = "404", description = "Fee not found."),
                     @ApiResponse(responseCode = "500", description = "Internal server error.")
             }
     )
     @GetMapping(value = "/fees/{borrowId}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<?> getFeeByBorrowId(
-            @Parameter(description = "Bearer JWT token", required = true, in = ParameterIn.HEADER)
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String token,
-            @Parameter(description = "ID of the borrow to retrieve fee for", required = true)
+            @Parameter(description = "Borrow ID to retrieve fee for", required = true)
             @PathVariable String borrowId) {
         try {
             Fees fee = feeService.getFeeByBorrowId(borrowId);
@@ -199,25 +131,16 @@ public class ApiController {
                 logger.warn("Fee not found for borrow ID: {}", borrowId);
                 return ResponseEntity.status(404).body("Fee not found for borrow ID: " + borrowId);
             }
-
             return ResponseEntity.ok(fee);
         } catch (Exception e) {
-            logger.error("Error retrieving fee for borrow ID {}: {}", borrowId, e.getMessage());
+            logger.error("Error retrieving fee: {}", e.getMessage());
             return ResponseEntity.status(500).body("Internal server error.");
         }
     }
 
-    /**
-     * Marks a fee as paid based on the provided fee ID.
-     *
-     * @param token the JWT token from the Authorization header
-     * @param feeId the ID of the fee to mark as paid
-     * @return ResponseEntity with success or error message
-     */
     @Operation(
-            summary = "Mark Fee as Paid",
+            summary = "Mark fee as paid",
             description = "Marks a fee as paid based on the provided fee ID.",
-            security = @SecurityRequirement(name = "bearerAuth"),
             responses = {
                     @ApiResponse(responseCode = "200", description = "Fee marked as paid successfully."),
                     @ApiResponse(responseCode = "500", description = "Internal server error.")
@@ -225,15 +148,13 @@ public class ApiController {
     )
     @PostMapping(value = "/mark-as-paid", consumes = MediaType.TEXT_PLAIN_VALUE, produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> markFeeAsPaid(
-            @Parameter(description = "Bearer JWT token", required = true, in = ParameterIn.HEADER)
-            @RequestHeader(HttpHeaders.AUTHORIZATION) String token,
-            @Parameter(description = "ID of the fee to mark as paid", required = true)
+            @Parameter(description = "Fee ID to mark as paid", required = true)
             @RequestBody String feeId) {
         try {
             feeService.markFeeAsPaid(feeId);
             return ResponseEntity.ok("Fee marked as paid successfully.");
         } catch (Exception e) {
-            logger.error("Error marking fee as paid for ID {}: {}", feeId, e.getMessage());
+            logger.error("Error marking fee as paid: {}", e.getMessage());
             return ResponseEntity.status(500).body("Internal server error.");
         }
     }

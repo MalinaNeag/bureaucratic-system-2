@@ -1,7 +1,11 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
-import { onAuthStateChanged, setPersistence, browserLocalPersistence } from 'firebase/auth';
-import { getFirestore, doc, getDoc } from 'firebase/firestore';
-import { auth } from '../firebaseconfig';
+import React, { createContext, useState, useEffect, useContext } from "react";
+import {
+    onAuthStateChanged,
+    setPersistence,
+    browserLocalPersistence,
+} from "firebase/auth";
+import { getFirestore, doc, getDoc } from "firebase/firestore";
+import { auth } from "../firebaseconfig";
 
 const AuthContext = createContext();
 
@@ -15,34 +19,52 @@ export const AuthProvider = ({ children }) => {
         const initializeAuth = async () => {
             try {
                 await setPersistence(auth, browserLocalPersistence); // Ensures persistence across sessions
-                const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-                    if (currentUser) {
-                        setUser(currentUser);
+                const unsubscribe = onAuthStateChanged(
+                    auth,
+                    async (currentUser) => {
+                        if (currentUser) {
+                            setUser(currentUser);
 
-                        // Fetch user role from Firestore
-                        try {
-                            const db = getFirestore();
-                            const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
-                            if (userDoc.exists()) {
-                                setRole(userDoc.data().role); // Set user role
-                            } else {
-                                console.warn('User document not found in Firestore.');
+                            // Display the authentication token in the terminal
+                            try {
+                                const token = await currentUser.getIdToken(); // Get the auth token
+                                console.log("Authentication Token:", token); // Log the token to the terminal
+                            } catch (error) {
+                                console.error("Error retrieving token:", error);
+                            }
+
+                            // Fetch user role from Firestore
+                            try {
+                                const db = getFirestore();
+                                const userDoc = await getDoc(
+                                    doc(db, "users", currentUser.uid)
+                                );
+                                if (userDoc.exists()) {
+                                    setRole(userDoc.data().role); // Set user role
+                                } else {
+                                    console.warn(
+                                        "User document not found in Firestore."
+                                    );
+                                    setRole(null);
+                                }
+                            } catch (error) {
+                                console.error(
+                                    "Error fetching user role:",
+                                    error
+                                );
                                 setRole(null);
                             }
-                        } catch (error) {
-                            console.error('Error fetching user role:', error);
+                        } else {
+                            setUser(null);
                             setRole(null);
                         }
-                    } else {
-                        setUser(null);
-                        setRole(null);
+                        setLoading(false); // End loading
                     }
-                    setLoading(false); // End loading
-                });
+                );
 
                 return unsubscribe;
             } catch (error) {
-                console.error('Error initializing Firebase auth:', error);
+                console.error("Error initializing Firebase auth:", error);
             }
         };
 
