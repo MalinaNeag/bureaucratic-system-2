@@ -1,11 +1,11 @@
 import { getFirestore, onSnapshot, collection } from "firebase/firestore";
 import React, { useState, useEffect } from "react";
-import MedianReadingTimeChart from "./components/Charts/MedianReadingTimeChart";
-import MembershipsOverTimeChart from "./components/Charts/MembershipsOverTimeChart";
-import RevenueByMembershipChart from "./components/Charts/RevenueByMembershipChart";
-import FeesDistributionChart from "./components/Charts/FeesDistributionChart";
-import HorizontalBarChart from "./components/Charts/HorizontalBarChart";
-import { db } from "./firebaseConfig";
+import MedianReadingTimeChart from "../components/Charts/MedianReadingTimeChart";
+import MembershipsOverTimeChart from "../components/Charts/MembershipsOverTimeChart";
+import RevenueByMembershipChart from "../components/Charts/RevenueByMembershipChart";
+import FeesDistributionChart from "../components/Charts/FeesDistributionChart";
+import HorizontalBarChart from "../components/Charts/HorizontalBarChart";
+import { db } from "../config/firebaseConfig";
 
 const ChartsPage = () => {
     const [readingTimeData, setReadingTimeData] = useState([]);
